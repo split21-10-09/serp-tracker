@@ -180,6 +180,94 @@ function XmlModal({ market, onClose, onImport }) {
   );
 }
 
+
+// ── SERP VIEW MODAL ──
+function SerpModal({ result, onClose }) {
+  if (!result) return null;
+  const serp = result.serp || {};
+  const organic = serp.organic || [];
+  const newsBox = serp.newsBox || [];
+  const featured = serp.featuredSnippet;
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)",
+      zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
+        padding: 28, width: "min(780px, 96vw)", maxHeight: "85vh", overflow: "auto",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 10, color: "var(--accent)", fontFamily: "var(--font-mono)", letterSpacing: 2, marginBottom: 6 }}>VUE SERP</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{result.keyword}</div>
+            <a href={serp.searchUrl} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+              ↗ Voir sur Google
+            </a>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 24 }}>×</button>
+        </div>
+
+        {/* Featured Snippet */}
+        {featured && (
+          <div style={{ background: "rgba(255,170,0,0.08)", border: "1px solid rgba(255,170,0,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: "var(--yellow)", fontFamily: "var(--font-mono)", letterSpacing: 1, marginBottom: 6 }}>⭐ POSITION 0 / FEATURED SNIPPET</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{featured.title}</div>
+            {featured.snippet && <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>{featured.snippet}</div>}
+            {featured.link && <a href={featured.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--accent)", fontFamily: "var(--font-mono)" }}>{featured.link}</a>}
+          </div>
+        )}
+
+        {/* News Box */}
+        {newsBox.length > 0 && (
+          <div style={{ background: "rgba(162,89,255,0.08)", border: "1px solid rgba(162,89,255,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: "var(--accent3)", fontFamily: "var(--font-mono)", letterSpacing: 1, marginBottom: 10 }}>📰 NEWS BOX ({newsBox.length} articles)</div>
+            {newsBox.map((n, i) => (
+              <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < newsBox.length - 1 ? "1px solid rgba(162,89,255,0.15)" : "none" }}>
+                <a href={n.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--text)", textDecoration: "none", fontWeight: 600 }}>{n.title}</a>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginTop: 2 }}>{n.source} · {n.date}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Organic results */}
+        <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)", letterSpacing: 1, marginBottom: 10 }}>
+          RÉSULTATS ORGANIQUES ({organic.length} affichés)
+        </div>
+        {organic.length === 0 ? (
+          <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 20, fontSize: 13 }}>
+            Aucune donnée SERP — relancez un scan pour voir les résultats.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {organic.map((r, i) => (
+              <div key={i} style={{
+                padding: "10px 14px", borderRadius: 8,
+                background: r.isTarget ? "rgba(0,229,255,0.08)" : "var(--surface2)",
+                border: `1px solid ${r.isTarget ? "var(--accent)" : "var(--border)"}`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <span style={{
+                    fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, minWidth: 28,
+                    color: r.isTarget ? "var(--accent)" : "var(--text-muted)",
+                  }}>#{r.position}</span>
+                  {r.isTarget && <span style={{ fontSize: 10, background: "var(--accent)", color: "#000", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>VOUS</span>}
+                  <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{r.title}</span>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--accent)", fontFamily: "var(--font-mono)", marginBottom: 3, paddingLeft: 38 }}>{r.displayed_link}</div>
+                {r.snippet && <div style={{ fontSize: 12, color: "var(--text-muted)", paddingLeft: 38, lineHeight: 1.4 }}>{r.snippet}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN APP ──
 export default function App() {
   const [markets, setMarkets] = useState([]);
@@ -192,6 +280,7 @@ export default function App() {
   const [xmlModal, setXmlModal] = useState(null);
   const [filterLigue, setFilterLigue] = useState("all");
   const [tab, setTab] = useState("dashboard"); // dashboard | history
+  const [serpModal, setSerpModal] = useState(null);
 
   // Load markets
   useEffect(() => {
@@ -493,12 +582,20 @@ export default function App() {
                               ) : "—"}
                             </td>
                             <td style={{ padding: "10px 14px" }}>
-                              {hist.scans.length > 0 && (
-                                <button onClick={() => setHistoryModal({ keyword: kw.title })} style={{
-                                  background: "none", border: "1px solid var(--border)", borderRadius: 6,
-                                  color: "var(--text-muted)", padding: "3px 8px", fontSize: 12,
-                                }}>📈</button>
-                              )}
+                              <div style={{ display: "flex", gap: 6 }}>
+                                {hist.scans.length > 0 && (
+                                  <button onClick={() => setHistoryModal({ keyword: kw.title })} style={{
+                                    background: "none", border: "1px solid var(--border)", borderRadius: 6,
+                                    color: "var(--text-muted)", padding: "3px 8px", fontSize: 12,
+                                  }}>📈</button>
+                                )}
+                                {result?.serp && (
+                                  <button onClick={() => setSerpModal(result)} style={{
+                                    background: "none", border: "1px solid var(--border)", borderRadius: 6,
+                                    color: "var(--accent3)", padding: "3px 8px", fontSize: 12,
+                                  }}>SERP</button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -518,6 +615,12 @@ export default function App() {
           keyword={historyModal.keyword}
           scans={hist.scans}
           onClose={() => setHistoryModal(null)}
+        />
+      )}
+      {serpModal && (
+        <SerpModal
+          result={serpModal}
+          onClose={() => setSerpModal(null)}
         />
       )}
       {xmlModal && (

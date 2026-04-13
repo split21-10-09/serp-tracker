@@ -125,6 +125,31 @@ app.post("/scan", async (req, res) => {
         }
       }
 
+      // Store top 10 organic + special features for SERP view
+      const serpSnapshot = {
+        organic: organicResults.slice(0, 10).map((r) => ({
+          position: r.position,
+          title: r.title,
+          link: r.link,
+          displayed_link: r.displayed_link,
+          snippet: r.snippet,
+          isTarget: (r.link || "").toLowerCase().includes(market.targetDomain),
+        })),
+        newsBox: (data.news_results || []).slice(0, 5).map((r) => ({
+          title: r.title,
+          link: r.link,
+          source: r.source,
+          date: r.date,
+        })),
+        featuredSnippet: data.answer_box ? {
+          title: data.answer_box.title,
+          snippet: data.answer_box.snippet || data.answer_box.answer,
+          link: data.answer_box.link,
+        } : null,
+        totalOrganic: organicResults.length,
+        searchUrl: `https://www.google.com/search?q=${encodeURIComponent(kw.title)}`,
+      };
+
       results.push({
         keyword: kw.title,
         matchDate: kw.matchDate,
@@ -133,6 +158,7 @@ app.post("/scan", async (req, res) => {
         position,
         foundUrl,
         totalResults: organicResults.length,
+        serp: serpSnapshot,
       });
     } catch (e) {
       results.push({ keyword: kw.title, matchDate: kw.matchDate, ligue: kw.ligue, link: kw.link, position: null, error: e.message });
