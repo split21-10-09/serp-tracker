@@ -1,9 +1,0 @@
-{
-  "name": "serp-tracker",
-  "version": "1.0.0",
-  "scripts": {
-    "install:all": "cd backend && npm install && cd ../frontend && npm install",
-    "dev:backend": "cd backend && npm start",
-    "dev:frontend": "cd frontend && npm run dev"
-  }
-}
