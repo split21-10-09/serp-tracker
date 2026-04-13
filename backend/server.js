@@ -1,0 +1,169 @@
+const express = require("express");
+const cors = require("cors");
+const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const SERP_API_KEY = process.env.SERP_API_KEY || "";
+
+// In-memory store: { [marketId]: { scans: [ { timestamp, results: [{keyword, position, url, serp}] } ] } }
+const store = {};
+
+// ── MARKETS CONFIG ──
+const MARKETS = [
+  { id: "fr", label: "🇫🇷 France", google_domain: "google.fr", gl: "fr", hl: "fr", feedUrl: "https://www.sportytrader.com/pronostic.xml", targetDomain: "sportytrader.com" },
+  { id: "es", label: "🇪🇸 España", google_domain: "google.es", gl: "es", hl: "es", feedUrl: "https://www.sportytrader.es/pronostico.xml", targetDomain: "sportytrader.es" },
+  { id: "de", label: "🇩🇪 Deutschland", google_domain: "google.de", gl: "de", hl: "de", feedUrl: "https://www.sportytrader.de/prognose.xml", targetDomain: "sportytrader.de" },
+  { id: "it", label: "🇮🇹 Italia", google_domain: "google.it", gl: "it", hl: "it", feedUrl: "https://www.sportytrader.it/pronostici.xml", targetDomain: "sportytrader.it" },
+  { id: "pt", label: "🇵🇹 Portugal", google_domain: "google.pt", gl: "pt", hl: "pt", feedUrl: "https://www.sportytrader.pt/prognosticos.xml", targetDomain: "sportytrader.pt" },
+  { id: "br", label: "🇧🇷 Brasil", google_domain: "google.com.br", gl: "br", hl: "pt", feedUrl: "https://www.sportytrader.com.br/prognosticos.xml", targetDomain: "sportytrader.com.br" },
+  { id: "en", label: "🇬🇧 English", google_domain: "google.com", gl: "gb", hl: "en", feedUrl: "https://www.sportytrader.com/en/predictions.xml", targetDomain: "sportytrader.com" },
+  { id: "nl", label: "🇳🇱 Nederland", google_domain: "google.nl", gl: "nl", hl: "nl", feedUrl: "https://www.sportytrader.nl/voorspellingen.xml", targetDomain: "sportytrader.nl" },
+  { id: "pl", label: "🇵🇱 Polska", google_domain: "google.pl", gl: "pl", hl: "pl", feedUrl: "https://www.sportytrader.pl/prognozy.xml", targetDomain: "sportytrader.pl" },
+  { id: "tr", label: "🇹🇷 Türkiye", google_domain: "google.com.tr", gl: "tr", hl: "tr", feedUrl: "https://www.sportytrader.com.tr/tahminler.xml", targetDomain: "sportytrader.com.tr" },
+];
+
+// ── UTILS ──
+function parseRSS(xml) {
+  const items = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const block = match[1];
+    const title = (block.match(/<title>(.*?)<\/title>/) || [])[1] || "";
+    const link = (block.match(/<link>(.*?)<\/link>/) || [])[1] || "";
+    const matchDate = (block.match(/<matchDate>(.*?)<\/matchDate>/) || [])[1] || "";
+    const ligue = (block.match(/<ligue>(.*?)<\/ligue>/) || [])[1] || "";
+    if (title) items.push({ title: title.trim(), link: link.trim(), matchDate: matchDate.trim(), ligue: ligue.trim() });
+  }
+  return items;
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ── ROUTES ──
+
+// GET /markets
+app.get("/markets", (req, res) => {
+  res.json(MARKETS.map((m) => ({ id: m.id, label: m.label, feedUrl: m.feedUrl })));
+});
+
+// POST /fetch-rss  { marketId, xmlContent? }
+// Returns parsed items from RSS (either fetched or from provided XML)
+app.post("/fetch-rss", async (req, res) => {
+  const { marketId, xmlContent } = req.body;
+  const market = MARKETS.find((m) => m.id === marketId);
+  if (!market) return res.status(400).json({ error: "Marché inconnu" });
+
+  let xml = xmlContent || "";
+
+  if (!xml) {
+    try {
+      const resp = await fetch(market.feedUrl, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; SerpTracker/1.0)" },
+        timeout: 10000,
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      xml = await resp.text();
+    } catch (e) {
+      return res.status(500).json({ error: `Impossible de récupérer le feed : ${e.message}. Collez le XML manuellement.` });
+    }
+  }
+
+  const items = parseRSS(xml);
+  const today = todayStr();
+  const filtered = items.filter((i) => i.matchDate && i.matchDate.startsWith(today));
+  res.json({ total: items.length, today: filtered.length, items: filtered, allItems: items });
+});
+
+// POST /scan  { marketId, keywords: [{title, matchDate, ligue, link}] }
+app.post("/scan", async (req, res) => {
+  if (!SERP_API_KEY) return res.status(500).json({ error: "SERP_API_KEY non configurée" });
+
+  const { marketId, keywords } = req.body;
+  const market = MARKETS.find((m) => m.id === marketId);
+  if (!market || !keywords || !keywords.length) return res.status(400).json({ error: "Paramètres invalides" });
+
+  const results = [];
+  const timestamp = new Date().toISOString();
+
+  for (let i = 0; i < keywords.length; i++) {
+    const kw = keywords[i];
+    try {
+      const params = new URLSearchParams({
+        api_key: SERP_API_KEY,
+        engine: "google",
+        q: kw.title,
+        google_domain: market.google_domain,
+        gl: market.gl,
+        hl: market.hl,
+        num: "100",
+      });
+
+      const resp = await fetch(`https://serpapi.com/search.json?${params}`);
+      const data = await resp.json();
+
+      let position = null;
+      let foundUrl = null;
+      const organicResults = data.organic_results || [];
+
+      for (let j = 0; j < organicResults.length; j++) {
+        const r = organicResults[j];
+        const link = (r.link || "").toLowerCase();
+        if (link.includes(market.targetDomain)) {
+          position = r.position || j + 1;
+          foundUrl = r.link;
+          break;
+        }
+      }
+
+      results.push({
+        keyword: kw.title,
+        matchDate: kw.matchDate,
+        ligue: kw.ligue,
+        link: kw.link,
+        position,
+        foundUrl,
+        totalResults: organicResults.length,
+      });
+    } catch (e) {
+      results.push({ keyword: kw.title, matchDate: kw.matchDate, ligue: kw.ligue, link: kw.link, position: null, error: e.message });
+    }
+
+    if (i < keywords.length - 1) await sleep(800);
+  }
+
+  // Store scan
+  if (!store[marketId]) store[marketId] = { scans: [] };
+  store[marketId].scans.push({ timestamp, results });
+  // Keep max 50 scans per market
+  if (store[marketId].scans.length > 50) store[marketId].scans.shift();
+
+  res.json({ timestamp, results, marketId });
+});
+
+// GET /history/:marketId
+app.get("/history/:marketId", (req, res) => {
+  const { marketId } = req.params;
+  res.json(store[marketId] || { scans: [] });
+});
+
+// DELETE /history/:marketId
+app.delete("/history/:marketId", (req, res) => {
+  delete store[marketId];
+  res.json({ ok: true });
+});
+
+// Health check
+app.get("/health", (req, res) => res.json({ ok: true }));
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`SERP Tracker backend running on port ${PORT}`));
