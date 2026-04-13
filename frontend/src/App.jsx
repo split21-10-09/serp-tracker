@@ -251,24 +251,27 @@ export default function App() {
     setScanning(true);
     setScanProgress({ current: 0, total: kws.length });
 
-    // We call the backend which handles the scanning loop
-    // But we want progress updates — so we'll do it kw by kw from frontend
-    const results = [];
-    for (let i = 0; i < kws.length; i++) {
-      setScanProgress({ current: i + 1, total: kws.length });
-      try {
-        const resp = await fetch(`${API}/scan`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ marketId: activeMarket, keywords: [kws[i]] }),
-        });
-        const data = await resp.json();
-        if (data.results) results.push(...data.results);
-      } catch (e) {
-        results.push({ keyword: kws[i].title, matchDate: kws[i].matchDate, ligue: kws[i].ligue, position: null, error: e.message });
-      }
+    const total = kws.length;
+    let current = 0;
+    const progressInterval = setInterval(() => {
+      current = Math.min(current + 1, total - 1);
+      setScanProgress({ current, total });
+    }, 1000);
+
+    try {
+      const resp = await fetch(`${API}/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marketId: activeMarket, keywords: kws }),
+      });
+      const data = await resp.json();
+      if (data.error) alert("Erreur scan : " + data.error);
+    } catch (e) {
+      alert("Erreur scan : " + e.message);
     }
 
+    clearInterval(progressInterval);
+    setScanProgress({ current: total, total });
     setScanning(false);
     await loadHistory(activeMarket);
   };
