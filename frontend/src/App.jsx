@@ -210,13 +210,21 @@ function SerpModal({ result, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 24 }}>×</button>
         </div>
 
-        {/* Featured Snippet */}
+        {/* True Featured Snippet (autre domaine) */}
         {featured && (
           <div style={{ background: "rgba(255,170,0,0.08)", border: "1px solid rgba(255,170,0,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: "var(--yellow)", fontFamily: "var(--font-mono)", letterSpacing: 1, marginBottom: 6 }}>⭐ POSITION 0 / FEATURED SNIPPET</div>
+            <div style={{ fontSize: 10, color: "var(--yellow)", fontFamily: "var(--font-mono)", letterSpacing: 1, marginBottom: 6 }}>⚠️ POSITION 0 — CONCURRENT EN FEATURED SNIPPET</div>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{featured.title}</div>
             {featured.snippet && <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>{featured.snippet}</div>}
             {featured.link && <a href={featured.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--accent)", fontFamily: "var(--font-mono)" }}>{featured.link}</a>}
+          </div>
+        )}
+
+        {/* Notre site en answer box enrichie */}
+        {serp.answerBoxIsOurs && (
+          <div style={{ background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: "var(--accent)", fontFamily: "var(--font-mono)", letterSpacing: 1, marginBottom: 4 }}>✅ RÉSULTAT ENRICHI #1 — SPORTYTRADER</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Notre page est affichée en position #1 avec extrait enrichi (pas un vrai featured snippet concurrent).</div>
           </div>
         )}
 

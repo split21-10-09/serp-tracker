@@ -114,16 +114,31 @@ app.post("/scan", async (req, res) => {
       let position = null;
       let foundUrl = null;
       const organicResults = data.organic_results || [];
+      const answerBox = data.answer_box || null;
 
-      for (let j = 0; j < organicResults.length; j++) {
-        const r = organicResults[j];
-        const link = (r.link || "").toLowerCase();
-        if (link.includes(market.targetDomain)) {
-          position = r.position || j + 1;
-          foundUrl = r.link;
-          break;
+      // Check answer_box first (= position 0 or top organic enrichi)
+      if (answerBox && answerBox.link && answerBox.link.toLowerCase().includes(market.targetDomain)) {
+        // It's our domain in answer box — treat as position 1 (enriched result, not true pos 0)
+        position = 1;
+        foundUrl = answerBox.link;
+      }
+
+      // Then check organic results
+      if (!position) {
+        for (let j = 0; j < organicResults.length; j++) {
+          const r = organicResults[j];
+          const link = (r.link || "").toLowerCase();
+          if (link.includes(market.targetDomain)) {
+            position = r.position || j + 1;
+            foundUrl = r.link;
+            break;
+          }
         }
       }
+
+      // Detect true featured snippet (position 0): answer_box from a DIFFERENT domain
+      const isTrueFeaturedSnippet = answerBox && answerBox.link &&
+        !answerBox.link.toLowerCase().includes(market.targetDomain);
 
       // Store top 10 organic + special features for SERP view
       const serpSnapshot = {
@@ -141,11 +156,12 @@ app.post("/scan", async (req, res) => {
           source: r.source,
           date: r.date,
         })),
-        featuredSnippet: data.answer_box ? {
-          title: data.answer_box.title,
-          snippet: data.answer_box.snippet || data.answer_box.answer,
-          link: data.answer_box.link,
+        featuredSnippet: isTrueFeaturedSnippet ? {
+          title: answerBox.title,
+          snippet: answerBox.snippet || answerBox.answer,
+          link: answerBox.link,
         } : null,
+        answerBoxIsOurs: answerBox && answerBox.link && answerBox.link.toLowerCase().includes(market.targetDomain),
         totalOrganic: organicResults.length,
         searchUrl: `https://www.google.com/search?q=${encodeURIComponent(kw.title)}`,
       };
