@@ -590,10 +590,3 @@ function HistoryTab({ hist }) {
   );
 }
 
-function posBg(p) {
-  if (!p) return "rgba(107,107,138,0.1)";
-  if (p <= 3) return "rgba(0,224,150,0.12)";
-  if (p <= 10) return "rgba(0,229,255,0.10)";
-  if (p <= 20) return "rgba(255,170,0,0.10)";
-  return "rgba(255,61,113,0.10)";
-}
