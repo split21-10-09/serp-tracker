@@ -21,8 +21,8 @@ const MARKETS = [
   { id: "br", label: "🇧🇷 Brasil", google_domain: "google.com.br", gl: "br", hl: "pt", feedUrl: "https://www.sportytrader.com.br/prognosticos.xml", targetDomain: "sportytrader.com.br" },
   { id: "en", label: "🇬🇧 English", google_domain: "google.com", gl: "gb", hl: "en", feedUrl: "https://www.sportytrader.com/en/predictions.xml", targetDomain: "sportytrader.com" },
   { id: "nl", label: "🇳🇱 Nederland", google_domain: "google.nl", gl: "nl", hl: "nl", feedUrl: "https://www.sportytrader.nl/voorspellingen.xml", targetDomain: "sportytrader.nl" },
-  { id: "pl", label: "🇵🇱 Polska", google_domain: "google.pl", gl: "pl", hl: "pl", feedUrl: "https://www.sportytrader.pl/prognozy.xml", targetDomain: "sportytrader.pl" },
-  { id: "tr", label: "🇹🇷 Türkiye", google_domain: "google.com.tr", gl: "tr", hl: "tr", feedUrl: "https://www.sportytrader.com.tr/tahminler.xml", targetDomain: "sportytrader.com.tr" },
+  { id: "mx", label: "🇲🇽 México", google_domain: "google.com.mx", gl: "mx", hl: "es", feedUrl: "https://www.sportytrader.mx/pronosticos.xml", targetDomain: "sportytrader.mx" },
+  { id: "us", label: "🇺🇸 USA", google_domain: "google.com", gl: "us", hl: "en", feedUrl: "https://www.sportytrader.com/us/predictions.xml", targetDomain: "sportytrader.com" },
 ];
 
 // ── UTILS ──
