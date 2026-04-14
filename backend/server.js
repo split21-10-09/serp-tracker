@@ -179,6 +179,7 @@ app.post("/scan", async (req, res) => {
           link: answerBox.link,
         } : null,
         answerBoxIsOurs: !!answerBoxIsOurs,
+        hasFeaturedPosition: !!answerBoxIsOurs,
         totalOrganic: organicResults.length,
         searchUrl: `https://www.${market.google_domain}/search?q=${encodeURIComponent(buildSearchQuery(kw.title, marketId))}&gl=${market.gl}&hl=${market.hl}`,
       };
@@ -206,6 +207,7 @@ app.post("/scan", async (req, res) => {
         foundUrl,
         inNewsBox,
         newsPosition,
+        isFeatured: !!answerBoxIsOurs,
         totalResults: organicResults.length,
         serp: serpSnapshot,
       });

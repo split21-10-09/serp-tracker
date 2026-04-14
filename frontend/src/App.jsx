@@ -600,6 +600,13 @@ export default function App() {
                                 ) : (
                                   <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>
                                 )}
+                                {result?.isFeatured && (
+                                  <span style={{
+                                    display: "inline-block", padding: "2px 7px", borderRadius: 5,
+                                    background: "rgba(255,170,0,0.15)", color: "var(--yellow)",
+                                    fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                                  }}>⭐ P0</span>
+                                )}
                                 {result?.inNewsBox && (
                                   <span style={{
                                     display: "inline-block", padding: "2px 7px", borderRadius: 5,
