@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // ── API BASE URL ──
@@ -285,7 +285,9 @@ export default function App() {
   const [filterLigue, setFilterLigue] = useState("all");
   const [tab, setTab] = useState("dashboard"); // dashboard | history
   const [serpModal, setSerpModal] = useState(null);
-  const [dayFilter, setDayFilter] = useState("today"); // today | tomorrow | all
+  const [dayFilter, setDayFilter] = useState("today"); // today | tomorrow
+  const [selectedKws, setSelectedKws] = useState({}); // { marketId: Set of kw.title }
+  const stopScanRef = useRef(false);
 
   // Load markets
   useEffect(() => {
@@ -339,35 +341,52 @@ export default function App() {
   // Scan
   const handleScan = async () => {
     if (!activeMarket) return;
-    const kws = keywords[activeMarket];
-    if (!kws || !kws.length) { alert("Importez d'abord les mots-clés via le feed RSS."); return; }
+    const sel = selectedKws[activeMarket];
+    const kwsToScan = filteredKws.filter((k) => sel && sel.has(k.title));
+    if (!kwsToScan.length) { alert("Sélectionnez au moins un mot-clé à scanner."); return; }
 
+    stopScanRef.current = false;
     setScanning(true);
-    setScanProgress({ current: 0, total: kws.length });
+    setScanProgress({ current: 0, total: kwsToScan.length });
 
-    const total = kws.length;
-    let current = 0;
-    const progressInterval = setInterval(() => {
-      current = Math.min(current + 1, total - 1);
-      setScanProgress({ current, total });
-    }, 1000);
-
-    try {
-      const resp = await fetch(`${API}/scan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marketId: activeMarket, keywords: kws }),
-      });
-      const data = await resp.json();
-      if (data.error) alert("Erreur scan : " + data.error);
-    } catch (e) {
-      alert("Erreur scan : " + e.message);
+    const scanResults = [];
+    for (let i = 0; i < kwsToScan.length; i++) {
+      if (stopScanRef.current) break;
+      setScanProgress({ current: i + 1, total: kwsToScan.length });
+      try {
+        const resp = await fetch(`${API}/scan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ marketId: activeMarket, keywords: [kwsToScan[i]] }),
+        });
+        const data = await resp.json();
+        if (data.results) scanResults.push(...data.results);
+      } catch (e) {}
     }
 
-    clearInterval(progressInterval);
-    setScanProgress({ current: total, total });
     setScanning(false);
+    stopScanRef.current = false;
     await loadHistory(activeMarket);
+  };
+
+  const handleStop = () => {
+    stopScanRef.current = true;
+  };
+
+  const toggleSelect = (marketId, title) => {
+    setSelectedKws((prev) => {
+      const set = new Set(prev[marketId] || []);
+      set.has(title) ? set.delete(title) : set.add(title);
+      return { ...prev, [marketId]: set };
+    });
+  };
+
+  const selectAll = (marketId, kws) => {
+    setSelectedKws((prev) => {
+      const current = prev[marketId] || new Set();
+      const allSelected = kws.every((k) => current.has(k.title));
+      return { ...prev, [marketId]: allSelected ? new Set() : new Set(kws.map((k) => k.title)) };
+    });
   };
 
   // ── RENDER ──
@@ -482,13 +501,20 @@ export default function App() {
                     padding: "10px 18px", background: "var(--surface2)", border: "1px solid var(--border)",
                     color: "var(--text)", borderRadius: 8, fontSize: 13, fontWeight: 600,
                   }}>📋 XML Manuel</button>
-                  <button onClick={handleScan} disabled={scanning || !kws.length} style={{
-                    padding: "10px 22px", background: scanning ? "var(--surface2)" : "var(--accent)",
-                    border: "none", color: scanning ? "var(--text-muted)" : "#000",
-                    borderRadius: 8, fontSize: 13, fontWeight: 700,
-                  }}>
-                    {scanning ? `⏳ ${scanProgress.current}/${scanProgress.total}` : "🚀 Lancer le scan"}
-                  </button>
+                  {scanning ? (
+                    <button onClick={handleStop} style={{
+                      padding: "10px 22px", background: "var(--red)", border: "none",
+                      color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                    }}>⏹ Stop ({scanProgress.current}/{scanProgress.total})</button>
+                  ) : (
+                    <button onClick={handleScan} disabled={!filteredKws.length} style={{
+                      padding: "10px 22px", background: "var(--accent)", border: "none",
+                      color: "#000", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                      opacity: !filteredKws.length ? 0.4 : 1,
+                    }}>
+                      🚀 Scanner ({(selectedKws[activeMarket]?.size) || 0})
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -514,7 +540,7 @@ export default function App() {
 
               {/* Day filter */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                {[["today", "Aujourd'hui"], ["tomorrow", "Demain"], ["all", "Tous"]].map(([val, label]) => (
+                {[["today", "Aujourd'hui"], ["tomorrow", "Demain"]].map(([val, label]) => (
                   <button key={val} onClick={() => setDayFilter(val)} style={{
                     padding: "6px 16px", borderRadius: 20,
                     border: `1px solid ${dayFilter === val ? "var(--accent)" : "var(--border)"}`,
@@ -554,11 +580,17 @@ export default function App() {
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
-                        {["Mot-clé", "Ligue", "Date match", "Position", "Δ", "URL", "📈"].map((h) => (
+                        {["", "Mot-clé", "Ligue", "Date match", "Position", "Δ", "URL", "📈"].map((h, hi) => (
                           <th key={h} style={{
                             padding: "10px 14px", textAlign: "left", fontSize: 10,
                             color: "var(--text-muted)", fontFamily: "var(--font-mono)", letterSpacing: 1, fontWeight: 700,
-                          }}>{h}</th>
+                          }}>{hi === 0 ? (
+                            <input type="checkbox"
+                              checked={filteredKws.length > 0 && filteredKws.every((k) => selectedKws[activeMarket]?.has(k.title))}
+                              onChange={() => selectAll(activeMarket, filteredKws)}
+                              style={{ accentColor: "var(--accent)", width: 15, height: 15, cursor: "pointer" }}
+                            />
+                          ) : h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -571,6 +603,13 @@ export default function App() {
                             borderBottom: "1px solid var(--border)",
                             background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
                           }}>
+                            <td style={{ padding: "10px 14px", width: 36 }}>
+                              <input type="checkbox"
+                                checked={!!(selectedKws[activeMarket]?.has(kw.title))}
+                                onChange={() => toggleSelect(activeMarket, kw.title)}
+                                style={{ accentColor: "var(--accent)", width: 15, height: 15, cursor: "pointer" }}
+                              />
+                            </td>
                             <td style={{ padding: "10px 14px", fontSize: 13, maxWidth: 280 }}>
                               <a href={kw.link} target="_blank" rel="noopener noreferrer"
                                 style={{ color: "var(--text)", textDecoration: "none", display: "block" }}
