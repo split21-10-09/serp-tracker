@@ -107,7 +107,7 @@ function HistoryModal({ keyword, scans, onClose }) {
               }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>{fmt(s.timestamp)}</span>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: posColor(r?.position) }}>
-                  {r?.position ? `#${r.position}` : "NF"}
+                  {r?.position ? `#${r.position}` : (r?.inNewsBox ? "—" : ">T10")}
                 </span>
               </div>
             );
@@ -600,7 +600,7 @@ export default function App() {
                                     display: "inline-block", padding: "3px 10px", borderRadius: 6,
                                     background: posBg(pos), color: posColor(pos),
                                     fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700,
-                                  }}>{pos ? `#${pos}` : "NF"}</span>
+                                  }}>{pos ? `#${pos}` : (result?.inNewsBox ? "—" : ">T10")}</span>
                                 ) : (
                                   <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>
                                 )}
@@ -720,7 +720,7 @@ function HistoryTab({ hist }) {
                             display: "inline-block", padding: "2px 8px", borderRadius: 5,
                             background: posBg(r.position), color: posColor(r.position),
                             fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700,
-                          }}>{r.position ? `#${r.position}` : "NF"}</span>
+                          }}>{r.position ? `#${r.position}` : (r.inNewsBox ? "—" : ">T10")}</span>
                         </td>
                         <td style={{ padding: "7px 16px", fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                           {r.foundUrl || "—"}
