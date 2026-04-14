@@ -282,7 +282,6 @@ export default function App() {
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
   const [historyModal, setHistoryModal] = useState(null);
   const [xmlModal, setXmlModal] = useState(null);
-  const [filterLigue, setFilterLigue] = useState("all");
   const [tab, setTab] = useState("dashboard"); // dashboard | history
   const [serpModal, setSerpModal] = useState(null);
   const [dayFilter, setDayFilter] = useState("today"); // today | tomorrow
@@ -395,7 +394,6 @@ export default function App() {
   const hist = history[activeMarket] || { scans: [] };
   const lastScan = hist.scans[hist.scans.length - 1];
 
-  const ligues = ["all", ...Array.from(new Set(kws.map((k) => k.ligue).filter(Boolean)))];
   const todayStr = new Date().toISOString().slice(0, 10);
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const kwsByDay = kws.filter((k) => {
@@ -403,7 +401,7 @@ export default function App() {
     if (dayFilter === "tomorrow") return k.matchDate && k.matchDate.startsWith(tomorrowStr);
     return true;
   });
-  const filteredKws = filterLigue === "all" ? kwsByDay : kwsByDay.filter((k) => k.ligue === filterLigue);
+  const filteredKws = kwsByDay;
 
   const found = lastScan ? lastScan.results.filter((r) => r.position).length : 0;
   const notFound = lastScan ? lastScan.results.filter((r) => !r.position).length : 0;
@@ -550,18 +548,7 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Ligue filter */}
-              {kws.length > 0 && (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-                  {ligues.map((l) => (
-                    <button key={l} onClick={() => setFilterLigue(l)} style={{
-                      padding: "5px 12px", borderRadius: 20, border: `1px solid ${filterLigue === l ? "var(--accent)" : "var(--border)"}`,
-                      background: filterLigue === l ? "rgba(0,229,255,0.1)" : "none",
-                      color: filterLigue === l ? "var(--accent)" : "var(--text-muted)", fontSize: 12,
-                    }}>{l === "all" ? "Toutes ligues" : l}</button>
-                  ))}
-                </div>
-              )}
+
 
               {/* Keywords table */}
               {kws.length === 0 ? (
