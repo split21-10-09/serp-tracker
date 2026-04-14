@@ -132,7 +132,7 @@ function XmlModal({ market, onClose, onImport }) {
       });
       const data = await resp.json();
       if (data.error) { alert(data.error); return; }
-      onImport(filterToday ? data.items : data.allItems, market.id);
+      onImport(data.allItems, market.id); // always store all, frontend filters by day
       onClose();
     } catch (e) { alert("Erreur : " + e.message); }
   };
@@ -157,12 +157,8 @@ function XmlModal({ market, onClose, onImport }) {
             borderRadius: 8, color: "var(--text)", padding: 12, fontSize: 12, resize: "vertical",
           }}
         />
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, marginBottom: 20 }}>
-          <input type="checkbox" id="today" checked={filterToday} onChange={(e) => setFilterToday(e.target.checked)}
-            style={{ accentColor: "var(--accent)", width: 16, height: 16 }} />
-          <label htmlFor="today" style={{ fontSize: 13, color: "var(--text-muted)", cursor: "pointer" }}>
-            Importer uniquement les matchs du jour
-          </label>
+        <div style={{ marginTop: 12, marginBottom: 20, fontSize: 12, color: "var(--text-muted)" }}>
+          Tous les matchs seront importés — utilisez les filtres Aujourd'hui / Demain sur le dashboard.
         </div>
         <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{
@@ -316,7 +312,7 @@ export default function App() {
     if (activeMarket) loadHistory(activeMarket);
   }, [activeMarket, loadHistory]);
 
-  // Fetch RSS
+  // Fetch RSS — always store allItems, dayFilter handles display
   const fetchRSS = async (marketId) => {
     try {
       const resp = await fetch(`${API}/fetch-rss`, {
@@ -329,7 +325,7 @@ export default function App() {
         setXmlModal(markets.find((m) => m.id === marketId));
         return;
       }
-      setKeywords((k) => ({ ...k, [marketId]: data.items }));
+      setKeywords((k) => ({ ...k, [marketId]: data.allItems }));
     } catch (e) {
       setXmlModal(markets.find((m) => m.id === marketId));
     }
@@ -337,7 +333,7 @@ export default function App() {
 
   // Import from XML modal
   const handleXmlImport = (items, marketId) => {
-    setKeywords((k) => ({ ...k, [marketId]: items }));
+    setKeywords((k) => ({ ...k, [marketId]: items })); // items already = allItems from XmlModal
   };
 
   // Scan
