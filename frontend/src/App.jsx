@@ -299,6 +299,14 @@ export default function App() {
       .catch(() => {});
   }, []);
 
+  // Keep backend alive - ping every 8 minutes to prevent Render spin-down
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch(`${API}/health`).catch(() => {});
+    }, 8 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Load history for active market
   const loadHistory = useCallback(async (marketId) => {
     if (!marketId) return;
@@ -315,12 +323,16 @@ export default function App() {
 
   // Fetch RSS — always store allItems, dayFilter handles display
   const fetchRSS = async (marketId) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 70000); // 70s for Render cold start
     try {
       const resp = await fetch(`${API}/fetch-rss`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ marketId }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await resp.json();
       if (data.error) {
         setXmlModal(markets.find((m) => m.id === marketId));
@@ -328,6 +340,8 @@ export default function App() {
       }
       setKeywords((k) => ({ ...k, [marketId]: data.allItems }));
     } catch (e) {
+      clearTimeout(timeout);
+      // If aborted (timeout) or network error, show XML modal
       setXmlModal(markets.find((m) => m.id === marketId));
     }
   };
