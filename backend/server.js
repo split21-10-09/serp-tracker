@@ -153,8 +153,11 @@ app.post("/scan", async (req, res) => {
       }
 
       // Detect true featured snippet (position 0): answer_box from a DIFFERENT domain
+      // Exclude knowledge panels (no link) and news highlights
       const isTrueFeaturedSnippet = answerBox && answerBox.link &&
-        !answerBox.link.toLowerCase().includes(market.targetDomain);
+        !answerBox.link.toLowerCase().includes(market.targetDomain) &&
+        answerBox.type !== "news_result" &&
+        answerBox.type !== "top_stories";
 
       // Store top 10 organic + special features for SERP view
       const serpSnapshot = {
@@ -182,8 +185,8 @@ app.post("/scan", async (req, res) => {
         searchUrl: `https://www.${market.google_domain}/search?q=${encodeURIComponent(buildSearchQuery(kw.title, marketId))}&gl=${market.gl}&hl=${market.hl}`,
       };
 
-      // Check if our domain appears in news box
-      const newsResults = data.news_results || [];
+      // Check if our domain appears in news box (SerpAPI uses news_results OR top_stories)
+      const newsResults = [...(data.news_results || []), ...(data.top_stories || [])];
       let inNewsBox = false;
       let newsPosition = null;
       for (let n = 0; n < newsResults.length; n++) {
