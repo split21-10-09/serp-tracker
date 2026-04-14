@@ -14,16 +14,29 @@ const store = {};
 // ── MARKETS CONFIG ──
 const MARKETS = [
   { id: "fr", label: "🇫🇷 France", google_domain: "google.fr", gl: "fr", hl: "fr", feedUrl: "https://www.sportytrader.com/pronostic.xml", targetDomain: "sportytrader.com" },
-  { id: "es", label: "🇪🇸 España", google_domain: "google.es", gl: "es", hl: "es", feedUrl: "https://www.sportytrader.es/pronostico.xml", targetDomain: "sportytrader.es" },
-  { id: "de", label: "🇩🇪 Deutschland", google_domain: "google.de", gl: "de", hl: "de", feedUrl: "https://www.sportytrader.de/prognose.xml", targetDomain: "sportytrader.de" },
+  { id: "de", label: "🇩🇪 Deutschland", google_domain: "google.de", gl: "de", hl: "de", feedUrl: "https://www.sportytrader.de/prognose-tipps.xml", targetDomain: "sportytrader.de" },
   { id: "it", label: "🇮🇹 Italia", google_domain: "google.it", gl: "it", hl: "it", feedUrl: "https://www.sportytrader.it/pronostici.xml", targetDomain: "sportytrader.it" },
   { id: "pt", label: "🇵🇹 Portugal", google_domain: "google.pt", gl: "pt", hl: "pt", feedUrl: "https://www.sportytrader.pt/prognosticos.xml", targetDomain: "sportytrader.pt" },
-  { id: "br", label: "🇧🇷 Brasil", google_domain: "google.com.br", gl: "br", hl: "pt", feedUrl: "https://www.sportytrader.com.br/prognosticos.xml", targetDomain: "sportytrader.com.br" },
-  { id: "en", label: "🇬🇧 English", google_domain: "google.com", gl: "gb", hl: "en", feedUrl: "https://www.sportytrader.com/en/predictions.xml", targetDomain: "sportytrader.com" },
-  { id: "nl", label: "🇳🇱 Nederland", google_domain: "google.nl", gl: "nl", hl: "nl", feedUrl: "https://www.sportytrader.nl/voorspellingen.xml", targetDomain: "sportytrader.nl" },
-  { id: "mx", label: "🇲🇽 México", google_domain: "google.com.mx", gl: "mx", hl: "es", feedUrl: "https://www.sportytrader.mx/pronosticos.xml", targetDomain: "sportytrader.mx" },
-  { id: "us", label: "🇺🇸 USA", google_domain: "google.com", gl: "us", hl: "en", feedUrl: "https://www.sportytrader.com/us/predictions.xml", targetDomain: "sportytrader.com" },
+  { id: "br", label: "🇧🇷 Brasil", google_domain: "google.com.br", gl: "br", hl: "pt", feedUrl: "https://www.sportytrader.com/pt-br/palpites.xml", targetDomain: "sportytrader.com" },
+  { id: "en", label: "🇬🇧 English", google_domain: "google.co.uk", gl: "gb", hl: "en", feedUrl: "https://www.sportytrader.com/en/predictions.xml", targetDomain: "sportytrader.com" },
+  { id: "nl", label: "🇳🇱 Nederland", google_domain: "google.nl", gl: "nl", hl: "nl", feedUrl: "https://www.sportytrader.nl/voorspellingen-tips.xml", targetDomain: "sportytrader.nl" },
+  { id: "mx", label: "🇲🇽 México", google_domain: "google.com.mx", gl: "mx", hl: "es", feedUrl: "https://www.sportytrader.com/es/pronosticos.xml", targetDomain: "sportytrader.com" },
+  { id: "es", label: "🇪🇸 España", google_domain: "google.es", gl: "es", hl: "es", feedUrl: "https://www.sportytrader.es/pronosticos.xml", targetDomain: "sportytrader.es" },
 ];
+
+// Keyword transform: clean title before sending to SerpAPI
+function buildSearchQuery(title, marketId) {
+  let q = title;
+  // DE: remove "Wett" word
+  if (marketId === "de") {
+    q = q.replace(/\bWett\b/gi, "").replace(/\s+/g, " ").trim();
+  }
+  // All markets: remove " - " separator (with spaces around dash)
+  q = q.replace(/ - /g, " ").replace(/ – /g, " ");
+  // Lowercase
+  q = q.toLowerCase().trim();
+  return q;
+}
 
 // ── UTILS ──
 function parseRSS(xml) {
@@ -101,7 +114,7 @@ app.post("/scan", async (req, res) => {
       const params = new URLSearchParams({
         api_key: SERP_API_KEY,
         engine: "google",
-        q: kw.title,
+        q: buildSearchQuery(kw.title, marketId),
         google_domain: market.google_domain,
         gl: market.gl,
         hl: market.hl,
@@ -166,13 +179,29 @@ app.post("/scan", async (req, res) => {
         searchUrl: `https://www.google.com/search?q=${encodeURIComponent(kw.title)}`,
       };
 
+      // Check if our domain appears in news box
+      const newsResults = data.news_results || [];
+      let inNewsBox = false;
+      let newsPosition = null;
+      for (let n = 0; n < newsResults.length; n++) {
+        const nlink = (newsResults[n].link || "").toLowerCase();
+        if (nlink.includes(market.targetDomain)) {
+          inNewsBox = true;
+          newsPosition = n + 1;
+          break;
+        }
+      }
+
       results.push({
         keyword: kw.title,
+        searchQuery: buildSearchQuery(kw.title, marketId),
         matchDate: kw.matchDate,
         ligue: kw.ligue,
         link: kw.link,
         position,
         foundUrl,
+        inNewsBox,
+        newsPosition,
         totalResults: organicResults.length,
         serp: serpSnapshot,
       });
