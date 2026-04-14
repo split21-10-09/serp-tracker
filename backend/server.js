@@ -85,15 +85,13 @@ app.post("/fetch-rss", async (req, res) => {
 
   if (!xml) {
     try {
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 8000);
       const resp = await fetch(market.feedUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "application/rss+xml, application/xml, text/xml, */*",
-          "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-          "Referer": `https://${market.feedUrl.split("/")[2]}/`,
-          "Cache-Control": "no-cache",
-        },
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: controller.signal,
       });
+      clearTimeout(fetchTimeout);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       xml = await resp.text();
     } catch (e) {
