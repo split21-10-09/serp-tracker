@@ -31,10 +31,13 @@ function buildSearchQuery(title, marketId) {
   if (marketId === "de") {
     q = q.replace(/\bWett\b/gi, "").replace(/\s+/g, " ").trim();
   }
-  // All markets: remove " - " separator (with spaces around dash)
-  q = q.replace(/ - /g, " ").replace(/ – /g, " ");
+  // All markets: remove dashes (with or without spaces), en-dash, em-dash
+  q = q.replace(/ - /g, " ").replace(/ – /g, " ").replace(/ — /g, " ");
+  q = q.replace(/-/g, " ").replace(/–/g, " ").replace(/—/g, " ");
+  // Collapse multiple spaces
+  q = q.replace(/\s+/g, " ").trim();
   // Lowercase
-  q = q.toLowerCase().trim();
+  q = q.toLowerCase();
   return q;
 }
 
@@ -176,7 +179,7 @@ app.post("/scan", async (req, res) => {
         } : null,
         answerBoxIsOurs: answerBox && answerBox.link && answerBox.link.toLowerCase().includes(market.targetDomain),
         totalOrganic: organicResults.length,
-        searchUrl: `https://www.google.com/search?q=${encodeURIComponent(kw.title)}`,
+        searchUrl: `https://www.${market.google_domain}/search?q=${encodeURIComponent(buildSearchQuery(kw.title, marketId))}&gl=${market.gl}&hl=${market.hl}`,
       };
 
       // Check if our domain appears in news box
