@@ -289,6 +289,7 @@ export default function App() {
   const [filterLigue, setFilterLigue] = useState("all");
   const [tab, setTab] = useState("dashboard"); // dashboard | history
   const [serpModal, setSerpModal] = useState(null);
+  const [dayFilter, setDayFilter] = useState("today"); // today | tomorrow | all
 
   // Load markets
   useEffect(() => {
@@ -380,7 +381,14 @@ export default function App() {
   const lastScan = hist.scans[hist.scans.length - 1];
 
   const ligues = ["all", ...Array.from(new Set(kws.map((k) => k.ligue).filter(Boolean)))];
-  const filteredKws = filterLigue === "all" ? kws : kws.filter((k) => k.ligue === filterLigue);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const kwsByDay = kws.filter((k) => {
+    if (dayFilter === "today") return k.matchDate && k.matchDate.startsWith(todayStr);
+    if (dayFilter === "tomorrow") return k.matchDate && k.matchDate.startsWith(tomorrowStr);
+    return true;
+  });
+  const filteredKws = filterLigue === "all" ? kwsByDay : kwsByDay.filter((k) => k.ligue === filterLigue);
 
   const found = lastScan ? lastScan.results.filter((r) => r.position).length : 0;
   const notFound = lastScan ? lastScan.results.filter((r) => !r.position).length : 0;
@@ -508,6 +516,18 @@ export default function App() {
                 </div>
               )}
 
+              {/* Day filter */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                {[["today", "Aujourd'hui"], ["tomorrow", "Demain"], ["all", "Tous"]].map(([val, label]) => (
+                  <button key={val} onClick={() => setDayFilter(val)} style={{
+                    padding: "6px 16px", borderRadius: 20,
+                    border: `1px solid ${dayFilter === val ? "var(--accent)" : "var(--border)"}`,
+                    background: dayFilter === val ? "rgba(0,229,255,0.1)" : "none",
+                    color: dayFilter === val ? "var(--accent)" : "var(--text-muted)", fontSize: 12, fontWeight: 600,
+                  }}>{label}</button>
+                ))}
+              </div>
+
               {/* Ligue filter */}
               {kws.length > 0 && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -555,12 +575,17 @@ export default function App() {
                             borderBottom: "1px solid var(--border)",
                             background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
                           }}>
-                            <td style={{ padding: "10px 14px", fontSize: 13, maxWidth: 260 }}>
+                            <td style={{ padding: "10px 14px", fontSize: 13, maxWidth: 280 }}>
                               <a href={kw.link} target="_blank" rel="noopener noreferrer"
-                                style={{ color: "var(--text)", textDecoration: "none" }}
+                                style={{ color: "var(--text)", textDecoration: "none", display: "block" }}
                                 onMouseEnter={(e) => e.target.style.color = "var(--accent)"}
                                 onMouseLeave={(e) => e.target.style.color = "var(--text)"}
                               >{kw.title}</a>
+                              {result?.searchQuery && (
+                                <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                                  🔍 {result.searchQuery}
+                                </span>
+                              )}
                             </td>
                             <td style={{ padding: "10px 14px", fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
                               {kw.ligue || "—"}
@@ -569,15 +594,24 @@ export default function App() {
                               {kw.matchDate ? kw.matchDate.slice(0, 16) : "—"}
                             </td>
                             <td style={{ padding: "10px 14px" }}>
-                              {result ? (
-                                <span style={{
-                                  display: "inline-block", padding: "3px 10px", borderRadius: 6,
-                                  background: posBg(pos), color: posColor(pos),
-                                  fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700,
-                                }}>{pos ? `#${pos}` : "NF"}</span>
-                              ) : (
-                                <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>
-                              )}
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                {result ? (
+                                  <span style={{
+                                    display: "inline-block", padding: "3px 10px", borderRadius: 6,
+                                    background: posBg(pos), color: posColor(pos),
+                                    fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700,
+                                  }}>{pos ? `#${pos}` : "NF"}</span>
+                                ) : (
+                                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>
+                                )}
+                                {result?.inNewsBox && (
+                                  <span style={{
+                                    display: "inline-block", padding: "2px 7px", borderRadius: 5,
+                                    background: "rgba(162,89,255,0.15)", color: "var(--accent3)",
+                                    fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                                  }}>📰 NEWS{result.newsPosition ? ` #${result.newsPosition}` : ""}</span>
+                                )}
+                              </div>
                             </td>
                             <td style={{ padding: "10px 14px" }}>
                               <Delta scans={hist.scans} keyword={kw.title} />
