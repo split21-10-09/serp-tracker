@@ -75,7 +75,9 @@ app.get("/markets", (req, res) => {
 // POST /fetch-rss  { marketId, xmlContent? }
 // Returns parsed items from RSS (either fetched or from provided XML)
 app.post("/fetch-rss", async (req, res) => {
+  try {
   const { marketId, xmlContent } = req.body;
+  console.log(`[RSS] Request for market: ${marketId}`);
   const market = MARKETS.find((m) => m.id === marketId);
   if (!market) return res.status(400).json({ error: "Marché inconnu" });
 
@@ -99,10 +101,20 @@ app.post("/fetch-rss", async (req, res) => {
     }
   }
 
-  const items = parseRSS(xml);
-  const today = todayStr();
-  const filtered = items.filter((i) => i.matchDate && i.matchDate.startsWith(today));
-  res.json({ total: items.length, today: filtered.length, items: filtered, allItems: items });
+  try {
+    const items = parseRSS(xml);
+    const today = todayStr();
+    const filtered = items.filter((i) => i.matchDate && i.matchDate.startsWith(today));
+    console.log(`[RSS] ${marketId}: ${items.length} items, ${filtered.length} today`);
+    res.json({ total: items.length, today: filtered.length, items: filtered, allItems: items });
+  } catch (e) {
+    console.error(`[RSS] Parse error:`, e.message);
+    res.status(500).json({ error: `Erreur parsing XML : ${e.message}` });
+  }
+  } catch (e) {
+    console.error(`[RSS] Unhandled error:`, e.message);
+    res.status(500).json({ error: `Erreur serveur : ${e.message}` });
+  }
 });
 
 // POST /scan  { marketId, keywords: [{title, matchDate, ligue, link}] }
