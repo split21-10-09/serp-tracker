@@ -132,7 +132,7 @@ function XmlModal({ market, onClose, onImport }) {
       });
       const data = await resp.json();
       if (data.error) { alert(data.error); return; }
-      onImport(data.allItems, market.id); // always store all, frontend filters by day
+      onImport(data.allItems || data.items || [], market.id);
       onClose();
     } catch (e) { alert("Erreur : " + e.message); }
   };
@@ -321,28 +321,40 @@ export default function App() {
     if (activeMarket) loadHistory(activeMarket);
   }, [activeMarket, loadHistory]);
 
-  // Fetch RSS — always store allItems, dayFilter handles display
-  const fetchRSS = async (marketId) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 70000); // 70s for Render cold start
-    try {
-      const resp = await fetch(`${API}/fetch-rss`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marketId }),
-        signal: controller.signal,
+  // Parse RSS XML string client-side
+  const parseRSSClient = (xml) => {
+    const items = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+    while ((match = itemRegex.exec(xml)) !== null) {
+      const block = match[1];
+      const title = (block.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/) || [])[1] || "";
+      const link = (block.match(/<link>(.*?)<\/link>/) || [])[1] || "";
+      const matchDate = (block.match(/<matchDate>(.*?)<\/matchDate>/) || [])[1] || "";
+      const ligue = (block.match(/<ligue>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/ligue>/) || [])[1] || "";
+      if (title.trim()) items.push({
+        title: title.trim(), link: link.trim(),
+        matchDate: matchDate.trim(), ligue: ligue.trim()
       });
-      clearTimeout(timeout);
-      const data = await resp.json();
-      if (data.error) {
-        setXmlModal(markets.find((m) => m.id === marketId));
-        return;
-      }
-      setKeywords((k) => ({ ...k, [marketId]: data.allItems }));
+    }
+    return items;
+  };
+
+  // Fetch RSS directly from browser (avoids backend network restrictions)
+  const fetchRSS = async (marketId) => {
+    const mkt = markets.find((m) => m.id === marketId);
+    if (!mkt) return;
+    try {
+      // Use a CORS proxy to fetch the feed
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(mkt.feedUrl)}`;
+      const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const xml = await resp.text();
+      const items = parseRSSClient(xml);
+      if (!items.length) throw new Error("Feed vide ou mal parsé");
+      setKeywords((k) => ({ ...k, [marketId]: items }));
     } catch (e) {
-      clearTimeout(timeout);
-      // If aborted (timeout) or network error, show XML modal
-      setXmlModal(markets.find((m) => m.id === marketId));
+      setXmlModal(mkt);
     }
   };
 
